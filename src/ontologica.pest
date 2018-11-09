@@ -1,0 +1,20 @@
+WHITESPACE = _{" " | "\n" | "\r" | "\t"}
+lalpha = _{'a'..'z'}
+digit = _{'0'..'9'}
+
+tag = @{(lalpha | digit) ~ ("-" | lalpha | digit)*}
+string = @{"\"" ~ (ASCII_ALPHANUMERIC | " ")* ~ "\""}
+
+tag_set = {tag ~ ("," ~ tag)*}
+
+spec = {tag ~ "=" ~ (tag | string | ("(" ~ (tag | string) ~ (", " ~ (tag | string))* ~ ")"))}
+specialization_list = {spec+}
+specialization = {"+:" ~ tag ~ ("(" ~ specialization_list ~ ")")?}
+
+type_expr = {"!"? ~ tag}
+
+composition = {"{" ~ (tag ~ ":" ~ type_expr)+ ~ "}"}
+
+declaration = {tag_set ~ specialization? ~ composition? ~ ";"}
+
+ontology = {declaration+}

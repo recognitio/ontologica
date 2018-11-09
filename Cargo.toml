@@ -1,0 +1,10 @@
+[package]
+name = "ontologica"
+version = "0.1.0"
+authors = ["aaronhyperum <unysnhyperum@gmail.com>"]
+
+[dependencies]
+pest = "2.0"
+pest_derive = "2.0"
+petgraph = "0.4.13"
+rand = "0.5"
