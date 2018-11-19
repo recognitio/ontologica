@@ -1,120 +1,221 @@
-use std::{collections::hash_map::HashMap, vec::Vec};
-use std::cell::RefCell;
+use std::collections::HashMap;
 
-// For $ in Arrow, the sentence Tail $ Head can be constructed.
+use indexmap::IndexMap;
+
 #[derive(Debug, Clone)]
-pub enum Arrow
+#[derive(Serialize, Deserialize)]
+#[derive(EnumKind)]
+#[enum_kind(AtomKind)]
+pub enum Atom
 {
-	IsSubsetOf,
+	IsHyponymOf,
 	IsSpecializedSubsetOf(HashMap<String, Vec<String>>),
 	Meronym,
 }
-#[derive(Debug, Clone)]
-pub struct Arc<Data>
-{
-	data: Data,
-	source: String,
-	target: String
-}
 
-impl<Data> Arc<Data>
-{
-	pub fn new(data: Data, source: String, target: String) -> Arc<Data>
-	{
-		Arc
-		{
-			data: data,
-			source: source,
-			target: target,
-		}
-	}
-
-	pub fn is_loop(&self) -> bool
-	{
-		self.source == self.target
-	}
-}
 #[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize)]
 pub struct Vertex
 {
-	sources: Vec<usize>,
-	targets: Vec<usize>,
+	ingress_indices: Vec<usize>,
+	egress_indices: Vec<usize>,
+	regress_indices: Vec<usize>,
 }
-
 
 impl Vertex
 {
-	pub fn new() -> Vertex
+	fn new() -> Vertex
 	{
 		Vertex
 		{
-			sources: Vec::new(),
-			targets: Vec::new(),
+			ingress_indices: Vec::new(),
+			egress_indices: Vec::new(),
+			regress_indices: Vec::new(),
 		}
 	}
-}
-#[derive(Debug, Clone)]
-pub struct Ontology
-{
-	vertices: HashMap<String, RefCell<Vertex>>,
-	arcs: Vec<Arc<Arrow>>
+
+	pub fn ingress_indices(&self) -> Vec<usize>
+	{
+		self.ingress_indices.clone()
+	}
+
+	pub fn egress_indices(&self) -> Vec<usize>
+	{
+		self.egress_indices.clone()
+	}
+
+	pub fn regress_indices(&self) -> Vec<usize>
+	{
+		self.regress_indices.clone()
+	}
+
+	pub fn weak_egress_indices(&self) -> Vec<usize>
+	{
+		self.egress_indices.iter().chain(self.regress_indices.iter()).map(|i| i.clone()).collect()
+	}
+
+	pub fn weak_ingress_indices(&self) -> Vec<usize>
+	{
+		self.ingress_indices.iter().chain(self.regress_indices.iter()).map(|i| i.clone()).collect()
+	}
+
+	pub fn transgress_indices(&self) -> Vec<usize>
+	{
+		self.ingress_indices.iter().chain(self.egress_indices.iter()).map(|i| i.clone()).collect()
+	}
+
+	pub fn arrow_indices(&self) -> Vec<usize>
+	{
+		self.ingress_indices.iter().chain(self.egress_indices.iter()).chain(self.regress_indices.iter()).map(|i| i.clone()).collect()
+	}
 }
 
-impl Ontology // a dimultigraph
+#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize)]
+pub struct Arrow
+{
+	data: Atom,
+	source_index: String,
+	target_index: String,
+}
+
+impl Arrow
+{
+	fn new(data: Atom, source_index: String, target_index: String) -> Arrow
+	{
+		Arrow
+		{
+			data: data,
+			source_index: source_index,
+			target_index: target_index,
+		}
+	}
+
+	pub fn data(&self) -> &Atom
+	{
+		&self.data
+	}
+
+	pub fn source_index(&self) -> &str
+	{
+		self.source_index.as_str()
+	}
+
+	pub fn target_index(&self) -> &str
+	{
+		self.target_index.as_str()
+	}
+}
+
+#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize)]
+pub struct Ontology
+{
+	vertices: IndexMap<String, Vertex>,
+	arrows: Vec<Arrow>,
+}
+
+impl Ontology
 {
 	pub fn new() -> Ontology
 	{
 		Ontology
 		{
-			vertices: HashMap::new(),
-			arcs: Vec::new(),
+			vertices: IndexMap::new(),
+			arrows: Vec::new(),
 		}
 	}
-	pub fn add_vertex(&mut self, label: &str) -> &mut Ontology
-	{
-		if !self.vertices.contains_key(label) {self.vertices.insert(label.to_owned(), RefCell::new(Vertex::new()));}
 
-		self
+	pub fn choose_vertex_name(&self) -> String
+	{
+		self.vertices.keys().next().unwrap_or(&"None :(".to_string()).to_string()
 	}
 
-	pub fn add_arc(&mut self, source: &str, target: &str, data: Arrow) -> &mut Ontology
+	pub fn vertex(&self, label: String) -> Vertex
 	{
-		if let Some(source_concept_cell) = self.vertices.get(source)
+		self.vertices.get(&label).unwrap_or(&Vertex::new()).clone()
+	}
+
+	pub fn add_vertex(&mut self, vertex_label: String)
+	{
+		if !self.vertices.contains_key(&vertex_label) {self.vertices.insert(vertex_label, Vertex::new());};
+	}
+
+	pub fn add_arrow(&mut self, arrow_data: Atom, source_label: &String, target_label: &String)
+	{
+		if self.vertices.get(source_label).is_none() || self.vertices.get(target_label).is_none()
 		{
-			if let Some(target_concept_cell) = self.vertices.get(target)
+			panic!("declared arrow has nonexistent source and/or target");
+		}
+		else
+		{
+			let arrow_index = self.arrows.len();
+			self.arrows.push(Arrow::new(arrow_data, source_label.clone(), target_label.clone()));
+
+			if source_label == target_label
 			{
-				source_concept_cell.borrow_mut().targets.push(self.arcs.len());
-				target_concept_cell.borrow_mut().sources.push(self.arcs.len());
-				self.arcs.push(Arc::new(data, source.to_owned(), target.to_owned()));
+				self.vertices.get_mut(source_label).unwrap().regress_indices.push(arrow_index);
+			}
+			else
+			{
+				self.vertices.get_mut(source_label).unwrap().egress_indices.push(arrow_index);
+				self.vertices.get_mut(target_label).unwrap().ingress_indices.push(arrow_index);
 			}
 		}
-		
-		self
 	}
 
-	pub fn get_random_concept_key(&self) -> &str
+	pub fn arrow_data(&self, arrow_index: usize) -> Option<&Atom>
 	{
-		use rand::{thread_rng, Rng};
-		let mut rng = thread_rng();
-
-		self.vertices.keys().nth(rng.gen_range(0, self.vertices.len())).unwrap().as_str()
+		Some(self.arrows.get(arrow_index)?.data())
 	}
 
-	pub fn get_outgoing_relations(&self, source: &str) -> Option<Vec<(Arrow, String)>>
+	pub fn ingresses(&self, vertex_label: &String) -> Vec<Arrow>
 	{
-		if let Some(concept) = self.vertices.get(source)
-		{
-			let mut arcs = Vec::new();
+		self.vertices[vertex_label].ingress_indices().iter().map(|i| self.arrows[i.clone()].clone()).collect()
+	}
+	
+	pub fn egresses(&self, vertex_label: &String) -> Vec<Arrow>
+	{
+		self.vertices[vertex_label].egress_indices().iter().map(|i| self.arrows[i.clone()].clone()).collect()
+	}
 
-			for &relation_index in concept.borrow().targets.as_slice()
-			{
-				let relation = self.arcs.get(relation_index).unwrap();
-				arcs.push((relation.data.clone(), relation.target.clone()));
-			}
+	pub fn regresses(&self, vertex_label: &String) -> Vec<Arrow>
+	{
+		self.vertices[vertex_label].regress_indices().iter().map(|i| self.arrows[i.clone()].clone()).collect()
+	}
 
-			return Some(arcs);
-		}
+	pub fn weak_ingresses(&self, vertex_label: &String) -> Vec<Arrow>
+	{
+		self.vertices[vertex_label].weak_ingress_indices().iter().map(|i| self.arrows[i.clone()].clone()).collect()
+	}
 
-		None
+	pub fn weak_egresses(&self, vertex_label: &String) -> Vec<Arrow>
+	{
+		self.vertices[vertex_label].weak_egress_indices().iter().map(|i| self.arrows[i.clone()].clone()).collect()
+	}
+
+	pub fn transgresses(&self, vertex_label: &String) -> Vec<Arrow>
+	{
+		self.vertices[vertex_label].transgress_indices().iter().map(|i| self.arrows[i.clone()].clone()).collect()
+	}
+
+	pub fn arrows(&self, vertex_label: &String) -> Vec<Arrow>
+	{
+		self.vertices[vertex_label].arrow_indices().iter().map(|i| self.arrows[i.clone()].clone()).collect()
+	}
+
+	pub fn hypernyms(&self, vertex_label: &String) -> Vec<String> //TODO - be certain that hypernyms may only be egresses.
+	{
+		self.egresses(vertex_label).iter().filter(|a| AtomKind::from(&a.data) == AtomKind::IsHyponymOf || AtomKind::from(&a.data) == AtomKind::IsSpecializedSubsetOf).map(|a| a.target_index().to_string()).collect()
+	}
+
+	pub fn hyponyms(&self, vertex_label: &String) -> Vec<String>
+	{
+		self.ingresses(vertex_label).iter().filter(|a| AtomKind::from(&a.data) == AtomKind::IsHyponymOf || AtomKind::from(&a.data) == AtomKind::IsSpecializedSubsetOf).map(|a| a.source_index().to_string()).collect()
+	}
+
+	pub fn vertex_labels(&self) -> Vec<String>
+	{
+		self.vertices.keys().map(|k| k.clone()).collect()
 	}
 }
