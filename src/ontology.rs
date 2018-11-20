@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use indexmap::IndexMap;
 
 #[derive(Debug, Clone)]
@@ -9,8 +7,8 @@ use indexmap::IndexMap;
 pub enum Atom
 {
 	IsHyponymOf,
-	IsSpecializedSubsetOf(HashMap<String, Vec<String>>),
-	Meronym,
+	IsMeronymOf,
+	IsTokenOf,
 }
 
 #[derive(Debug, Clone)]
@@ -206,12 +204,32 @@ impl Ontology
 
 	pub fn hypernyms(&self, vertex_label: &String) -> Vec<String> //TODO - be certain that hypernyms may only be egresses.
 	{
-		self.egresses(vertex_label).iter().filter(|a| AtomKind::from(&a.data) == AtomKind::IsHyponymOf || AtomKind::from(&a.data) == AtomKind::IsSpecializedSubsetOf).map(|a| a.target_index().to_string()).collect()
+		self.egresses(vertex_label).iter().filter(|a| AtomKind::from(&a.data) == AtomKind::IsHyponymOf).map(|a| a.target_index().to_string()).collect()
 	}
 
 	pub fn hyponyms(&self, vertex_label: &String) -> Vec<String>
 	{
-		self.ingresses(vertex_label).iter().filter(|a| AtomKind::from(&a.data) == AtomKind::IsHyponymOf || AtomKind::from(&a.data) == AtomKind::IsSpecializedSubsetOf).map(|a| a.source_index().to_string()).collect()
+		self.ingresses(vertex_label).iter().filter(|a| AtomKind::from(&a.data) == AtomKind::IsHyponymOf).map(|a| a.source_index().to_string()).collect()
+	}
+	
+	pub fn holonyms(&self, vertex_label: &String) -> Vec<String>
+	{
+		self.egresses(vertex_label).iter().filter(|a| AtomKind::from(&a.data) == AtomKind::IsMeronymOf).map(|a| a.target_index().to_string()).collect()
+	}
+
+	pub fn meronyms(&self, vertex_label: &String) -> Vec<String>
+	{
+		self.ingresses(vertex_label).iter().filter(|a| AtomKind::from(&a.data) == AtomKind::IsMeronymOf).map(|a| a.source_index().to_string()).collect()
+	}
+	
+	pub fn types(&self, vertex_label: &String) -> Vec<String>
+	{
+		self.egresses(vertex_label).iter().filter(|a| AtomKind::from(&a.data) == AtomKind::IsTokenOf).map(|a| a.target_index().to_string()).collect()
+	}
+
+	pub fn tokens(&self, vertex_label: &String) -> Vec<String>
+	{
+		self.ingresses(vertex_label).iter().filter(|a| AtomKind::from(&a.data) == AtomKind::IsTokenOf).map(|a| a.source_index().to_string()).collect()
 	}
 
 	pub fn vertex_labels(&self) -> Vec<String>

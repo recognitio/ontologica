@@ -2,19 +2,18 @@ WHITESPACE = _{" " | "\n" | "\r" | "\t"}
 lalpha = _{'a'..'z'}
 digit = _{'0'..'9'}
 
-tag = @{(lalpha | digit) ~ ("-" | lalpha | digit)*}
-string = @{"\"" ~ (ASCII_ALPHANUMERIC | " ")* ~ "\""}
+tag = @{(ASCII_ALPHANUMERIC | "_" | "-")+}
 
-tag_set = {tag ~ ("," ~ tag)*}
+//
 
-spec = {tag ~ "=" ~ (tag | string | ("(" ~ (tag | string) ~ (", " ~ (tag | string))* ~ ")"))}
-specialization_list = {spec+}
-specialization = {"+:" ~ tag ~ ("(" ~ specialization_list ~ ")")?}
+composition = {"<<" ~ tag ~ ("," ~ tag)*}
+subsumption = {"<+" ~ tag ~ ("," ~ tag)*}
+instantiation = {":" ~ tag ~ ("," ~ tag)*}
 
-type_expr = {"!"? ~ tag}
+aspect = {(subsumption | composition | instantiation)}
 
-composition = {"{" ~ (tag ~ ":" ~ type_expr)+ ~ "}"}
+//
 
-declaration = {tag_set ~ specialization? ~ composition? ~ ";"}
+declaration = {tag ~ ("," ~ tag)* ~ aspect*}
 
-ontology = {declaration+}
+ontology = {WHITESPACE* ~ declaration ~ ((";" ~ declaration) | ";")*}
